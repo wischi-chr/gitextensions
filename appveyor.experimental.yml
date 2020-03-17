@@ -1,9 +1,5 @@
 version: 66.66.66.{build}
 
-branches:
-  only:
-    - experimental/*
-
 # Do not build on tags (GitHub, Bitbucket, GitLab, Gitea)
 skip_tags: true
 
