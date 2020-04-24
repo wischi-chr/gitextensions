@@ -6049,6 +6049,39 @@ Value has been reset to empty value.</source>
       </trans-unit>
     </body>
   </file>
+  <file datatype="plaintext" original="FormResetBranch" source-language="en">
+    <body>
+      <trans-unit id="$this.Text">
+        <source>Reset branch</source>
+        <target />
+      </trans-unit>
+      <trans-unit id="BranchInfo.Text">
+        <source>Reset &amp;branch:</source>
+        <target />
+      </trans-unit>
+      <trans-unit id="Cancel.Text">
+        <source>Cancel</source>
+        <target />
+      </trans-unit>
+      <trans-unit id="ForceReset.Text">
+        <source>&amp;Force reset</source>
+        <target />
+      </trans-unit>
+      <trans-unit id="Ok.Text">
+        <source>OK</source>
+        <target />
+      </trans-unit>
+      <trans-unit id="ResetTo.Text">
+        <source>to commit</source>
+        <target />
+      </trans-unit>
+      <trans-unit id="labelResetBranchWarning.Text">
+        <source>You can only reset a branch safely if there is a direct path from it to selected revision.
+Forcing a branch to reset if it has not been merged might leave some commits unreachable.</source>
+        <target />
+      </trans-unit>
+    </body>
+  </file>
   <file datatype="plaintext" original="FormResetChanges" source-language="en">
     <body>
       <trans-unit id="$this.Text">
@@ -8684,6 +8717,10 @@ See the changes in the commit form.</source>
       </trans-unit>
       <trans-unit id="renameBranchToolStripMenuItem.Text">
         <source>Rename branch...</source>
+        <target />
+      </trans-unit>
+      <trans-unit id="resetAnotherBranchToHereToolStripMenuItem.Text">
+        <source>Reset another branch to here...</source>
         <target />
       </trans-unit>
       <trans-unit id="resetCurrentBranchToHereToolStripMenuItem.Text">
