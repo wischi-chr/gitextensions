@@ -42,6 +42,8 @@ build:
   verbosity: minimal
 
 install:
+- cmd: echo %APPVEYOR_REPO_COMMIT%
+- cmd: echo %APPVEYOR_PULL_REQUEST_HEAD_COMMIT%
 - cmd: git submodule update --init --recursive
 - cmd: echo /logger:"%ProgramFiles%\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll">> Directory.Build.rsp
 - cmd: |-
@@ -58,68 +60,37 @@ build_script:
       & .\scripts\Mark-RepoClean.ps1
     }
 
+    # if building a temporary merge with master, reset the git revision to the HEAD of the PR, keeping the files of the merge of course
+    if ($env:APPVEYOR_PULL_REQUEST_HEAD_COMMIT -and ($env:APPVEYOR_REPO_COMMIT -ne $env:APPVEYOR_PULL_REQUEST_HEAD_COMMIT))
+    {
+      git reset --soft "$env:APPVEYOR_PULL_REQUEST_HEAD_COMMIT" --
+    }
+
     # build
-    & .\cibuild.cmd -restore -build -buildNative
+    & .\cibuild.cmd -restore -build -buildNative -logFileName build.binlog
     if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
+
+    # for pull-requests we get merge-commits, and we reset to the actual PR commit, for the build contains the correct hash
+    # to verify the localisation was done correctly we don't need the original hash, so reset it back.
+    # refer to https://github.com/gitextensions/gitextensions/issues/7979
+    if ($env:APPVEYOR_PULL_REQUEST_TITLE) {
+      git reset HEAD --quiet -- "GitUI/Translation/English.xlf" "GitUI/Translation/English.Plugins.xlf"
+      git checkout --force -- "GitUI/Translation/English.xlf" "GitUI/Translation/English.Plugins.xlf"
+    }
+    & .\cibuild.cmd -loc -logFileName loc.binlog /p:NoBuild=true
 
 
 # to run your custom scripts instead of automatic tests
 test_script:
 - ps: |
-    $failBuildIfTestsFail = $env:FAIL_BUILD_IF_TESTS_FAIL
-    $runUnitTests         = $env:RUN_UNIT_TESTS
-    $runIntegrationTests  = $env:RUN_INTEGRATION_TESTS
-    $testRunCount         = $env:TEST_RUN_COUNT
-
-    Write-Host "FAIL_BUILD_IF_TESTS_FAIL:        ${failBuildIfTestsFail}"
-    Write-Host "RUN_UNIT_TESTS:                  ${runUnitTests}"
-    Write-Host "RUN_INTEGRATION_TESTS:           ${runIntegrationTests}"
-    Write-Host "TEST_RUN_COUNT:                  ${testRunCount}"
-    Write-Host "GE_TEST_SLEEP_SECONDS_ON_HANG:   ${env:GE_TEST_SLEEP_SECONDS_ON_HANG}"
-    Write-Host "GE_TEST_LAUNCH_DEBUGGER_ON_HANG: ${env:GE_TEST_LAUNCH_DEBUGGER_ON_HANG}"
-
-    $testErrorsTotal = 0
-    for ($testRun = 1; $testRun -le $testRunCount; $testRun++)
-    {
-        $failedBefore = if ($testRun -ne 1) { ", ${testErrorsTotal} test(s) failed before" }
-        Write-Host ""
-        Write-Host "[INFO]: Test Run ${testRun}/${testRunCount}${failedBefore}"
-
-        if ($runUnitTests        -ne 0) { & .\cibuild.cmd -test }
-        if ($runIntegrationTests -ne 0) { & .\cibuild.cmd -integrationTest }
-
-        Get-ChildItem -recurse artifacts\tests\TestResult.xml -ErrorAction SilentlyContinue `
-        | ForEach-Object {
-            $resultFilePath = "$_"
-            Get-Content $resultFilePath `
-            | Select-String -Pattern '<test-run id="[^"]*"\s+testcasecount="(\d+)"\s+result="([^"]*)"\s+total="(\d+)"\s+passed="(\d+)"\s+failed="(\d+)".*' `
-            | foreach {
-                $result = $_.Matches.Groups
-                #$result[0].Value
-                $total  = $result[1].Value
-                $passed = $result[4].Value
-                $failed = $result[5].Value
-                $notPassed = $total - $passed
-                $testErrors = $failed
-                $testProjectName = $resultFilePath.Split('\\')[-3]
-                $artifactName = "TestResult#${testRun}.${testErrors}err.${testProjectName}"
-                Push-AppveyorArtifact $resultFilePath -FileName "${artifactName}.xml"
-                if ($notPassed -ne 0) {
-                    $logFile = Get-ChildItem -recurse artifacts\$testProjectName*.log
-                    if ($testErrors -ne 0) { Push-AppveyorArtifact $logFile -FileName "${artifactName}.log" }
-                }
-                $testErrorsTotal += $testErrors
-            }
-        }
-    }
-    if ($testErrorsTotal -ne 0  -and  $failBuildIfTestsFail -ne 0) { $host.SetShouldExit($testErrorsTotal) }
+    Write-Host "Tests disabled"
 
 
 # scripts to run after tests
 after_test:
 - ps: |
     Write-Host "Preparing build artifacts..."
-    & .\cibuild.cmd -publish
+    & .\cibuild.cmd -publish -logFileName publish.binlog
     if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
 
 

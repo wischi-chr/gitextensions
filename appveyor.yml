@@ -25,10 +25,6 @@ build:
 
 install:
 - cmd: git submodule update --init --recursive
-- cmd: echo %APPVEYOR_REPO_COMMIT%
-- cmd: echo %APPVEYOR_PULL_REQUEST_HEAD_COMMIT%
-  # if building a temporary merge with master, reset the git revision to the HEAD of the PR, keeping the files of the merge of course
-- cmd: if not "%APPVEYOR_PULL_REQUEST_HEAD_COMMIT%" == "" if not "%APPVEYOR_PULL_REQUEST_HEAD_COMMIT%" == "%APPVEYOR_REPO_COMMIT%" git reset --soft "%APPVEYOR_PULL_REQUEST_HEAD_COMMIT%" --
 - cmd: echo /logger:"%ProgramFiles%\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll">> Directory.Build.rsp
 - cmd: |-
     cd scripts
@@ -44,25 +40,39 @@ build_script:
       & .\scripts\Mark-RepoClean.ps1
     }
 
+    # if building a temporary merge with master, reset the git revision to the HEAD of the PR, keeping the files of the merge of course
+    if ($env:APPVEYOR_PULL_REQUEST_HEAD_COMMIT -and ($env:APPVEYOR_REPO_COMMIT -ne $env:APPVEYOR_PULL_REQUEST_HEAD_COMMIT))
+    {
+      git reset --soft "$env:APPVEYOR_PULL_REQUEST_HEAD_COMMIT" --
+    }
+
     # build
-    & .\cibuild.cmd -restore -build -buildNative -loc
+    & .\cibuild.cmd -restore -build -buildNative -logFileName build.binlog
     if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
+
+    # for pull-requests we get merge-commits, and we reset to the actual PR commit, for the build contains the correct hash
+    # to verify the localisation was done correctly we don't need the original hash, so reset it back.
+    # refer to https://github.com/gitextensions/gitextensions/issues/7979
+    if ($env:APPVEYOR_PULL_REQUEST_TITLE) {
+      git reset HEAD --quiet -- "GitUI/Translation/English.xlf" "GitUI/Translation/English.Plugins.xlf"
+      git checkout --force -- "GitUI/Translation/English.xlf" "GitUI/Translation/English.Plugins.xlf"
+    }
+    & .\cibuild.cmd -loc -logFileName loc.binlog /p:NoBuild=true
 
 
 # to run your custom scripts instead of automatic tests
 test_script:
 - ps: |
-    & .\cibuild.cmd -test
+    & .\cibuild.cmd -test -logFileName unitTest.binlog /p:NoBuild=true
     if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode);  }
-    & .\cibuild.cmd -integrationTest
+    & .\cibuild.cmd -integrationTest -logFileName integrationTest.binlog /p:NoBuild=true
     if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
-
 
 # scripts to run after tests
 after_test:
 - ps: |
     Write-Host "Preparing build artifacts..."
-    & .\cibuild.cmd -publish
+    & .\cibuild.cmd -publish -logFileName publish.binlog
     if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
 
 
