@@ -71,13 +71,18 @@ build_script:
     if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
 
     # for pull-requests we get merge-commits, and we reset to the actual PR commit, for the build contains the correct hash
-    # to verify the localisation was done correctly we don't need the original hash, so reset it back.
+    # to verify the localisation was done correctly we don't need the original hash, so reset it back
     # refer to https://github.com/gitextensions/gitextensions/issues/7979
-    if ($env:APPVEYOR_PULL_REQUEST_TITLE) {
-      git reset HEAD --quiet -- "GitUI/Translation/English.xlf" "GitUI/Translation/English.Plugins.xlf"
-      git checkout --force -- "GitUI/Translation/English.xlf" "GitUI/Translation/English.Plugins.xlf"
+    if ($env:APPVEYOR_PULL_REQUEST_HEAD_COMMIT) {
+      git reset $env:APPVEYOR_PULL_REQUEST_HEAD_COMMIT --quiet -- "GitUI/Translation/English.xlf" "GitUI/Translation/English.Plugins.xlf"
+      git checkout                                     --force -- "GitUI/Translation/English.xlf" "GitUI/Translation/English.Plugins.xlf"
     }
-    & .\cibuild.cmd -loc -logFileName loc.binlog /p:NoBuild=true
+
+    # it would be nice to run '.\cibuild.cmd -loc' but it doesn't work without `-build` switch :\
+    Push-Location .\GitExtensions
+    dotnet msbuild /t:_UpdateEnglishTranslations /p:RunTranslationApp=true /v:m
+    if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
+    Pop-Location
 
 
 # to run your custom scripts instead of automatic tests
